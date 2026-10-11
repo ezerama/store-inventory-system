@@ -1,0 +1,265 @@
+import { useEffect, useState } from 'react';
+
+const emptyItemForm = {
+  name: '',
+  sku: '',
+  description: '',
+  quantity: '',
+  price: '',
+  low_stock_threshold: 5
+};
+
+const emptyOrderForm = {
+  customerName: '',
+  items: [{ sku: '', quantity: 1 }]
+};
+
+function App() {
+  const [inventory, setInventory] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [itemForm, setItemForm] = useState(emptyItemForm);
+  const [orderForm, setOrderForm] = useState(emptyOrderForm);
+  const [status, setStatus] = useState({ type: 'idle', message: '' });
+  const [loading, setLoading] = useState(false);
+
+  const fetchInventory = async () => {
+    const response = await fetch('/api/inventory');
+    const data = await response.json();
+    setInventory(data);
+  };
+
+  const fetchOrders = async () => {
+    const response = await fetch('/api/orders');
+    const data = await response.json();
+    setOrders(data);
+  };
+
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        await Promise.all([fetchInventory(), fetchOrders()]);
+      } catch (error) {
+        setStatus({ type: 'error', message: 'Unable to load inventory and orders.' });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  const handleInventoryChange = (event) => {
+    const { name, value } = event.target;
+    setItemForm((current) => ({ ...current, [name]: value }));
+  };
+
+  const handleItemSubmit = async (event) => {
+    event.preventDefault();
+    setStatus({ type: 'idle', message: '' });
+
+    const payload = {
+      name: itemForm.name,
+      sku: itemForm.sku,
+      description: itemForm.description,
+      quantity: Number(itemForm.quantity),
+      price: Number(itemForm.price),
+      low_stock_threshold: Number(itemForm.low_stock_threshold || 5)
+    };
+
+    try {
+      const response = await fetch('/api/inventory', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Unable to add inventory item.');
+      }
+
+      setStatus({ type: 'success', message: result.message });
+      setItemForm(emptyItemForm);
+      await fetchInventory();
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  const handleOrderChange = (event, index) => {
+    const { name, value } = event.target;
+    setOrderForm((current) => {
+      const updatedItems = [...current.items];
+      updatedItems[index] = { ...updatedItems[index], [name]: value };
+      return { ...current, items: updatedItems };
+    });
+  };
+
+  const addOrderItemField = () => {
+    setOrderForm((current) => ({
+      ...current,
+      items: [...current.items, { sku: '', quantity: 1 }]
+    }));
+  };
+
+  const handleOrderSubmit = async (event) => {
+    event.preventDefault();
+    setStatus({ type: 'idle', message: '' });
+
+    const payload = {
+      customerName: orderForm.customerName,
+      items: orderForm.items.map((item) => ({
+        sku: item.sku,
+        quantity: Number(item.quantity)
+      }))
+    };
+
+    try {
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      if (!response.ok) {
+        throw new Error(result.error || 'Unable to create order.');
+      }
+
+      setStatus({ type: 'success', message: result.message });
+      setOrderForm(emptyOrderForm);
+      await Promise.all([fetchInventory(), fetchOrders()]);
+    } catch (error) {
+      setStatus({ type: 'error', message: error.message });
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Store Inventory System</p>
+          <h1>Store Inventory Dashboard</h1>
+        </div>
+        <span className="version-badge">Build 1</span>
+      </header>
+
+      {status.message && (
+        <div className={`status-box status-${status.type}`}>
+          {status.message}
+        </div>
+      )}
+
+      <main className="content-grid">
+        <section className="panel">
+          <h2>Add Inventory Item</h2>
+          <form onSubmit={handleItemSubmit} className="stacked-form">
+            <input name="name" value={itemForm.name} onChange={handleInventoryChange} placeholder="Item name" />
+            <input name="sku" value={itemForm.sku} onChange={handleInventoryChange} placeholder="SKU" />
+            <textarea name="description" value={itemForm.description} onChange={handleInventoryChange} placeholder="Description" />
+            <div className="two-col">
+              <input name="quantity" type="number" min="0" value={itemForm.quantity} onChange={handleInventoryChange} placeholder="Quantity" />
+              <input name="price" type="number" min="0" step="0.01" value={itemForm.price} onChange={handleInventoryChange} placeholder="Price" />
+            </div>
+            <input name="low_stock_threshold" type="number" min="0" value={itemForm.low_stock_threshold} onChange={handleInventoryChange} placeholder="Low stock threshold" />
+            <button type="submit">Add item</button>
+          </form>
+        </section>
+
+        <section className="panel">
+          <h2>Create Order</h2>
+          <form onSubmit={handleOrderSubmit} className="stacked-form">
+            <input
+              value={orderForm.customerName}
+              onChange={(event) => setOrderForm((current) => ({ ...current, customerName: event.target.value }))}
+              placeholder="Customer name"
+            />
+
+            {orderForm.items.map((item, index) => (
+              <div key={index} className="order-item-row">
+                <input
+                  name="sku"
+                  value={item.sku}
+                  onChange={(event) => handleOrderChange(event, index)}
+                  placeholder="SKU"
+                />
+                <input
+                  name="quantity"
+                  type="number"
+                  min="1"
+                  value={item.quantity}
+                  onChange={(event) => handleOrderChange(event, index)}
+                  placeholder="Qty"
+                />
+              </div>
+            ))}
+
+            <div className="button-row">
+              <button type="button" className="secondary" onClick={addOrderItemField}>Add item</button>
+              <button type="submit">Create order</button>
+            </div>
+          </form>
+        </section>
+      </main>
+
+      <section className="panel">
+        <h2>Inventory</h2>
+        {loading ? (
+          <p>Loading inventory...</p>
+        ) : inventory.length === 0 ? (
+          <p>No inventory items found.</p>
+        ) : (
+          <div className="card-grid">
+            {inventory.map((item) => (
+              <article key={item.id} className={`inventory-card ${item.is_low_stock ? 'low-stock' : ''}`}>
+                <h3>{item.name}</h3>
+                <p className="sku">{item.sku}</p>
+                <p>{item.description || 'No description provided.'}</p>
+                <div className="meta-row">
+                  <span>Qty: {item.quantity}</span>
+                  <span>${Number(item.price).toFixed(2)}</span>
+                </div>
+                <div className="meta-row">
+                  <span className={item.is_low_stock ? 'alert' : 'normal'}>
+                    {item.is_low_stock ? 'Low stock' : 'In stock'}
+                  </span>
+                  <span>Threshold: {item.low_stock_threshold}</span>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <h2>Orders</h2>
+        {orders.length === 0 ? (
+          <p>No orders yet.</p>
+        ) : (
+          <div className="orders-list">
+            {orders.map((order) => (
+              <div key={order.id} className="order-card">
+                <div className="meta-row">
+                  <strong>#{order.id}</strong>
+                  <span>{order.customer_name}</span>
+                  <span>Status: {order.order_status}</span>
+                </div>
+                <ul>
+                  {(order.items || []).map((entry, index) => (
+                    <li key={`${order.id}-${entry.sku}-${index}`}>
+                      {entry.item_name} - {entry.quantity} x ${Number(entry.price).toFixed(2)}
+                    </li>
+                  ))}
+                </ul>
+                <strong>Total: ${Number(order.total_price).toFixed(2)}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+export default App;

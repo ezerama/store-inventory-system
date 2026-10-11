@@ -1,0 +1,14 @@
+.gitignore
+node_modules/
+.env
+.env.*
+!.env.example
+coverage/
+dist/
+build/
+*.log
+.DS_Store
+.vscode/
+.idea/
+**/.pytest_cache/
+**/__pycache__/

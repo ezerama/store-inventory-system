@@ -1,0 +1,74 @@
+const request = require('supertest');
+const { app, initSchema } = require('../server');
+
+beforeAll(async () => {
+  process.env.USE_PG_MEM = 'true';
+  await initSchema();
+});
+
+describe('Inventory API', () => {
+  test('GET /health returns ok', async () => {
+    const res = await request(app).get('/health');
+    expect(res.statusCode).toBe(200);
+    expect(res.body.status).toBe('ok');
+  });
+
+  test('GET /api/inventory returns inventory list', async () => {
+    const res = await request(app).get('/api/inventory');
+    expect(res.statusCode).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+    expect(res.body.length).toBeGreaterThan(0);
+  });
+
+  test('POST /api/inventory creates a valid item', async () => {
+    const res = await request(app)
+      .post('/api/inventory')
+      .send({
+        name: 'Notebook',
+        sku: 'NB-001',
+        description: 'College notebook',
+        quantity: 20,
+        price: 8.5,
+        low_stock_threshold: 5
+      });
+
+    expect(res.statusCode).toBe(201);
+    expect(res.body.item.sku).toBe('NB-001');
+  });
+
+  test('POST /api/inventory rejects duplicate SKU', async () => {
+    const res = await request(app)
+      .post('/api/inventory')
+      .send({
+        name: 'Duplicate Notebook',
+        sku: 'NB-001',
+        description: 'This should fail',
+        quantity: 3,
+        price: 9.5,
+        low_stock_threshold: 2
+      });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.body.error).toMatch(/same SKU/i);
+  });
+
+  test('PUT /api/inventory/:id rejects invalid quantity', async () => {
+    const first = await request(app).get('/api/inventory');
+    const id = first.body[0].id;
+
+    const res = await request(app)
+      .put(`/api/inventory/${id}`)
+      .send({ quantity: -5 });
+
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/non-negative/i);
+  });
+
+  test('DELETE /api/inventory/:id blocks deletion with stock remaining', async () => {
+    const first = await request(app).get('/api/inventory');
+    const id = first.body[0].id;
+    const res = await request(app).delete(`/api/inventory/${id}`);
+    expect(res.statusCode).toBe(400);
+    expect(res.body.error).toMatch(/still has stock/i);
+  });
+});
