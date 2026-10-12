@@ -4,13 +4,13 @@ pipeline {
   environment {
     APP_VERSION = "${env.BUILD_NUMBER}"
     POSTGRES_DB = 'store_inventory'
-    POSTGRES_USER = 'storeuser'
-    POSTGRES_PASSWORD = 'storepass'
+    POSTGRES_USER = 'store_user'
+    POSTGRES_PASSWORD = 'StorePass2026Secure'
     POSTGRES_PORT = '5432'
     DB_HOST = 'postgres'
     DB_NAME = 'store_inventory'
-    DB_USER = 'storeuser'
-    DB_PASSWORD = 'storepass'
+    DB_USER = 'store_user'
+    DB_PASSWORD = 'StorePass2026Secure'
   }
 
   triggers {
@@ -82,3 +82,4 @@ pipeline {
     }
   }
 }
+
