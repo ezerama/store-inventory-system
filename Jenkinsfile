@@ -2,6 +2,7 @@ pipeline {
   agent any
 
   environment {
+    COMPOSE_PROJECT_NAME = 'store-inventory-system-collab'
     APP_VERSION = "${env.BUILD_NUMBER}"
     POSTGRES_DB = 'store_inventory'
     POSTGRES_USER = 'store_user'
@@ -82,4 +83,5 @@ pipeline {
     }
   }
 }
+
 
